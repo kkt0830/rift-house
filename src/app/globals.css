@@ -795,7 +795,7 @@ footer span {
 .player-table-head,
 .player-table-row {
   display: grid;
-  grid-template-columns: minmax(180px, 2fr) minmax(90px, 1fr) minmax(115px, 1fr) 95px 58px;
+  grid-template-columns: minmax(180px, 2fr) minmax(90px, 1fr) minmax(115px, 1fr) 95px 150px;
   align-items: center;
   gap: 20px;
   padding: 17px 22px;
@@ -809,6 +809,15 @@ footer span {
 .player-table-row {
   border-top: 1px solid var(--border);
   min-height: 84px;
+}
+.row-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.row-actions .danger {
+  color: #e4a0a8;
+  border-color: #58414a;
 }
 .tier {
   font-size: 12px;
@@ -1436,9 +1445,10 @@ summary {
     grid-column: 2;
     grid-row: 2;
   }
-  .player-table-row button {
+  .player-table-row .row-actions {
     grid-column: 3;
     grid-row: 1/3;
+    flex-direction: column;
   }
   .management-grid {
     grid-template-columns: 1fr 1fr;
@@ -1846,6 +1856,10 @@ summary {
     grid-row: 2;
     text-align: right;
   }
+  .player-table-row .row-actions {
+    grid-column: 1/-1;
+    grid-row: 3;
+  }
   .player-table-row button {
     grid-column: 1/-1;
     grid-row: 3;
@@ -1961,6 +1975,12 @@ summary {
 .entry-card {
   width: min(100%, 490px);
   padding: 40px;
+  position: relative;
+}
+.entry-admin {
+  position: absolute;
+  top: 18px;
+  right: 18px;
 }
 .entry-brand {
   padding: 0;
@@ -2000,6 +2020,26 @@ summary {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.import-panel {
+  margin-bottom: 22px;
+}
+.import-panel h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.import-preview {
+  display: grid;
+  gap: 6px;
+  margin: 14px 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 13px;
+}
+.form-error {
+  color: #ff8d8d;
 }
 @media (max-width: 767px) {
   .topbar {
