@@ -1,12 +1,13 @@
 'use client';
 import { useState } from 'react';
-import { Plus, Search, SlidersHorizontal } from 'lucide-react';
+import { Plus, Search, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { usePlatform } from '@/components/provider';
 import { Empty, Modal, PageHeading, PlayerIdentity, Rating } from '@/components/ui';
 import { PlayerForm } from '@/components/player-form';
 import { Player, POSITIONS } from '@/domain/types';
+import { PlayerImport } from './player-import';
 export default function PlayerList({ administrative = false }: { administrative?: boolean }) {
-  const { data, currentPlayer, selectProfile } = usePlatform();
+  const { data, currentPlayer, selectProfile, services, run, busy } = usePlatform();
   const [query, setQuery] = useState('');
   const [position, setPosition] = useState('ALL');
   const [editing, setEditing] = useState<Player | 'new' | null>(null);
@@ -17,6 +18,7 @@ export default function PlayerList({ administrative = false }: { administrative?
   );
   return (
     <>
+      {administrative && <PlayerImport />}
       <PageHeading
         eyebrow="PLAYERS"
         title="함께하는 선수들"
@@ -64,17 +66,30 @@ export default function PlayerList({ administrative = false }: { administrative?
         {players.map((p) => (
           <div className="player-table-row" key={p.id}>
             <PlayerIdentity player={p} />
-            <span className={`tier tier-${p.tier.toLowerCase()}`}>{p.tier}</span>
+            <span className={`tier tier-${p.tier.split(' ')[0].toLowerCase()}`}>{p.tier}</span>
             <div className="positions">
               <span>{p.mainPosition}</span>
               <small>{p.subPosition}</small>
             </div>
             <Rating player={p} />
-            {(administrative || currentPlayer?.id === p.id) && (
-              <button className="small" onClick={() => setEditing(p)}>
-                수정
-              </button>
-            )}
+            <div className="row-actions">
+              {(administrative || currentPlayer?.id === p.id) && (
+                <button className="small" onClick={() => setEditing(p)}>수정</button>
+              )}
+              {administrative && (
+                <button
+                  className="small danger"
+                  disabled={busy}
+                  aria-label={`${p.displayName} 삭제`}
+                  onClick={() => {
+                    if (window.confirm(`${p.displayName} 선수를 삭제할까요?`))
+                      void run(() => services.players.delete(p.id), '선수를 삭제했습니다.');
+                  }}
+                >
+                  <Trash2 size={15} /> 삭제
+                </button>
+              )}
+            </div>
           </div>
         ))}
         {!players.length && <Empty text="검색 조건에 맞는 선수가 없습니다." />}

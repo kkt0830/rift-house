@@ -20,10 +20,10 @@ export function PlayerForm({
       displayName: initialName?.riotId ?? '',
       riotId: initialName?.riotId ?? '',
       riotTag: initialName?.riotTag || 'KR1',
-      tier: 'GOLD',
+      tier: 'GOLD 4',
       mainPosition: 'MID',
       subPosition: 'JUNGLE',
-      internalRating: TIER_RATINGS.GOLD,
+      internalRating: TIER_RATINGS['GOLD 4'],
       adminAdjustment: 0,
     },
   );
