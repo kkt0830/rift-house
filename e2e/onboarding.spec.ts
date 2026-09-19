@@ -13,7 +13,7 @@ test('fresh visit requires nickname, registration auto-fills rating and remember
   await expect(page.getByLabel('Riot Tag', { exact: true })).toHaveValue('KR9');
   await expect(page.getByLabel('내부 레이팅', { exact: true })).toHaveCount(0);
   await expect(page.getByLabel('운영자 보정', { exact: true })).toHaveCount(0);
-  await page.getByLabel('Riot Tier').selectOption('DIAMOND');
+  await page.getByLabel('Riot Tier').selectOption('DIAMOND 4');
   await expect(page.locator('.derived-value strong')).toHaveText('2000');
   await page.getByRole('button', { name: '선수 등록', exact: true }).click();
   await expect(page.getByRole('heading', { name: '나의소환사', exact: true })).toBeVisible();
