@@ -4,18 +4,22 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Swords } from 'lucide-react';
 import { usePlatform } from './provider';
 import { parseRiotName } from '@/services/platform';
+import { AdminAuthButton } from './admin-auth';
 export function EntryGate({ children }: { children: React.ReactNode }) {
-  const { currentPlayer, services, run, busy, selectProfile, setPendingName } = usePlatform();
+  const { currentPlayer, isAdmin, services, run, busy, selectProfile, setPendingName } = usePlatform();
   const [nickname, setNickname] = useState('');
   const path = usePathname();
   const router = useRouter();
-  if (currentPlayer || path === '/players/register') return children;
+  if (currentPlayer || isAdmin || path === '/players/register') return children;
   return (
     <main className="entry-screen">
       <section className="entry-card panel">
         <div className="brand entry-brand">
           <Swords />
           <span>RIFTHOUSE</span>
+        </div>
+        <div className="entry-admin">
+          <AdminAuthButton />
         </div>
         <div className="eyebrow">WELCOME TO THE RIFT</div>
         <h1>
