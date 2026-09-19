@@ -2,6 +2,7 @@ import { Repository } from '../data/repository';
 import {
   ChampionPick,
   CreateMatchInput,
+  CreateEventInput,
   CreatePlayerInput,
   Database,
   Match,
@@ -99,6 +100,29 @@ export function createServices(repository: Repository) {
           db.players.push(p);
           return p;
         }),
+      importMany: (inputs: SelfRegistrationInput[]) =>
+        repository.transact((db) => {
+          if (!inputs.length) throw new Error('등록할 선수가 없습니다.');
+          if (inputs.length > 500) throw new Error('한 번에 최대 500명까지 등록할 수 있습니다.');
+          const created = inputs.map((input) => {
+            const player: Player = {
+              id: id(),
+              displayName: input.displayName.trim(),
+              riotId: input.riotId.trim(),
+              riotTag: input.riotTag.trim(),
+              tier: input.tier,
+              mainPosition: input.mainPosition,
+              subPosition: input.subPosition,
+              internalRating: TIER_RATINGS[input.tier],
+              adminAdjustment: 0,
+            };
+            validatePlayer(player);
+            uniqueRiot(db, player);
+            db.players.push(player);
+            return player;
+          });
+          return created;
+        }),
       updateSelf: (playerId: string, input: SelfRegistrationInput) =>
         repository.transact((db) => {
           const p = db.players.find((p) => p.id === playerId);
@@ -156,6 +180,29 @@ export function createServices(repository: Repository) {
             });
           Object.assign(p, next);
           return p;
+        }),
+      delete: (playerId: string) =>
+        repository.transact((db) => {
+          const player = db.players.find((p) => p.id === playerId);
+          if (!player) throw new Error('이 선수를 찾을 수 없습니다.');
+          const recorded = db.matches.some(
+            (match) =>
+              ['IN_PROGRESS', 'COMPLETED'].includes(match.status) &&
+              (match.participantIds.includes(playerId) ||
+                match.series.games.some((game) => game.roster.some((slot) => slot.playerId === playerId))),
+          );
+          if (recorded) throw new Error('진행 중이거나 완료된 경기 기록이 있는 선수는 삭제할 수 없습니다.');
+          db.players = db.players.filter((p) => p.id !== playerId);
+          db.matches.forEach((match) => {
+            match.participantIds = match.participantIds.filter((id) => id !== playerId);
+            match.teams = match.teams.filter((slot) => slot.playerId !== playerId);
+            if (match.status === 'READY') match.status = 'DRAFT';
+          });
+          db.events.forEach((event) => {
+            event.registrations = event.registrations.filter((r) => r.playerId !== playerId);
+          });
+          db.ratingEvents = db.ratingEvents.filter((event) => event.playerId !== playerId);
+          return player;
         }),
     },
     matches: {
@@ -285,6 +332,31 @@ export function createServices(repository: Repository) {
         }),
     },
     events: {
+      create: (input: CreateEventInput) =>
+        repository.transact((db) => {
+          const name = input.name.trim();
+          const description = input.description.trim();
+          if (
+            !name ||
+            name.length > 100 ||
+            description.length > 500 ||
+            !Number.isFinite(Date.parse(input.scheduledAt)) ||
+            !Number.isInteger(input.capacity) ||
+            input.capacity < 1 ||
+            input.capacity > 500
+          ) throw new Error('이벤트 이름, 일정, 정원(1~500명)을 확인해 주세요.');
+          const event = {
+            id: id(),
+            name,
+            description,
+            scheduledAt: input.scheduledAt,
+            capacity: input.capacity,
+            matchIds: [],
+            registrations: [],
+          };
+          db.events.unshift(event);
+          return event;
+        }),
       register: (eventId: string, playerId: string) =>
         repository.transact((db) => {
           const e = db.events.find((e) => e.id === eventId);
