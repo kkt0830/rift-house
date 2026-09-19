@@ -2,8 +2,9 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { Database, Player } from '@/domain/types';
 import { LocalIdentityRepository } from '@/data/identity';
-import { LocalRepository } from '@/data/repository';
+import { createRepository } from '@/data/repository';
 import { createServices, Services } from '@/services/platform';
+import { supabase } from '@/lib/supabase';
 type Context = {
   data: Database;
   services: Services;
@@ -14,16 +15,23 @@ type Context = {
   clearProfile: () => void;
   pendingName: { riotId: string; riotTag: string } | null;
   setPendingName: (value: { riotId: string; riotTag: string } | null) => void;
+  isAdmin: boolean;
+  adminId: string | null;
+  adminLogin: (username: string, password: string) => Promise<boolean>;
+  adminLogout: () => Promise<void>;
 };
 const PlatformContext = createContext<Context | null>(null);
 export function PlatformProvider({ children }: { children: React.ReactNode }) {
-  const [services] = useState(() => createServices(new LocalRepository()));
+  const [repository] = useState(() => createRepository());
+  const [services] = useState(() => createServices(repository));
   const [identity] = useState(() => new LocalIdentityRepository());
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [pendingName, setPendingName] = useState<{ riotId: string; riotTag: string } | null>(null);
   const [data, setData] = useState<Database | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminId, setAdminId] = useState<string | null>(null);
   const refresh = useCallback(async () => {
     setData(await services.snapshot());
   }, [services]);
@@ -44,11 +52,32 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
       refresh().catch((e) => setNotice({ text: String(e.message), error: true }));
     };
     window.addEventListener('storage', onStorage);
+    const unsubscribe = repository.subscribe?.(onStorage);
     return () => {
       mounted = false;
       window.removeEventListener('storage', onStorage);
+      unsubscribe?.();
     };
-  }, [refresh, services, identity]);
+  }, [refresh, services, identity, repository]);
+
+  useEffect(() => {
+    if (!supabase) return;
+    const client = supabase;
+    const checkAdmin = async () => {
+      const token = localStorage.getItem('rift-house:admin-session');
+      if (!token) return setIsAdmin(false);
+      const { data, error } = await client.rpc('admin_session_role', { p_token: token });
+      if (error || !data) {
+        localStorage.removeItem('rift-house:admin-session');
+        setAdminId(null);
+        return setIsAdmin(false);
+      }
+      const separator = String(data).indexOf(':');
+      setAdminId(separator > -1 ? String(data).slice(separator + 1) : String(data));
+      setIsAdmin(true);
+    };
+    void checkAdmin();
+  }, []);
   function selectProfile(playerId: string) {
     identity.select(playerId);
     setCurrentId(playerId);
@@ -81,6 +110,39 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
       setBusy(false);
     }
   }
+  async function adminLogin(username: string, password: string) {
+    if (!supabase) throw new Error('Supabase 연결이 필요합니다.');
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.rpc('admin_login', {
+        p_username: username.trim().toLowerCase(),
+        p_password: password,
+      });
+      if (error) throw error;
+      if (!data) throw new Error('아이디 또는 비밀번호가 올바르지 않습니다.');
+      localStorage.setItem('rift-house:admin-session', String(data));
+      setIsAdmin(true);
+      setAdminId(username.trim().toLowerCase());
+      setNotice({ text: '관리자로 로그인했습니다.', error: false });
+      return true;
+    } catch (error) {
+      setNotice({
+        text: error instanceof Error ? error.message : '관리자 로그인에 실패했습니다.',
+        error: true,
+      });
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function adminLogout() {
+    const token = localStorage.getItem('rift-house:admin-session');
+    if (token) await supabase?.rpc('admin_logout', { p_token: token });
+    localStorage.removeItem('rift-house:admin-session');
+    setIsAdmin(false);
+    setAdminId(null);
+    setNotice({ text: '관리자에서 로그아웃했습니다.', error: false });
+  }
   return (
     <>
       {notice && (
@@ -106,6 +168,10 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
             clearProfile,
             pendingName,
             setPendingName,
+            isAdmin,
+            adminId,
+            adminLogin,
+            adminLogout,
           }}
         >
           {children}

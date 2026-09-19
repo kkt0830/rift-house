@@ -12,6 +12,7 @@ import {
   Trophy,
   Users,
 } from 'lucide-react';
+import { AdminAuthButton } from './admin-auth';
 const nav = [
   { href: '/', label: '대시보드', icon: LayoutDashboard },
   { href: '/players', label: '선수 관리', icon: Users },
@@ -21,7 +22,7 @@ const nav = [
 ];
 export function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
-  const { currentPlayer, clearProfile } = usePlatform();
+  const { currentPlayer, clearProfile, isAdmin } = usePlatform();
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -49,6 +50,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
         <div className="sidebar-bottom">
+          {isAdmin && <>
           <div className="nav-caption">MANAGEMENT</div>
           <Link className={path === '/admin' ? 'active' : ''} href="/admin">
             <Shield size={18} />
@@ -58,6 +60,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <Crown size={18} />
             시스템 설정
           </Link>
+          </>}
           <div className="community-label">
             <span className="community-icon">RH</span>
             <div>
@@ -86,6 +89,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             </strong>
           </div>
           <div className="topbar-actions">
+            <AdminAuthButton />
             {currentPlayer && (
               <>
                 <Link className="my-profile-link" href={`/players/${currentPlayer.id}`}>
@@ -96,10 +100,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 </button>
               </>
             )}
-            <Link href="/admin" className="mobile-admin">
-              <Shield size={16} />
-              <span>운영자</span>
-            </Link>
+            {isAdmin && (
+              <Link href="/admin" className="mobile-admin">
+                <Shield size={16} />
+                <span>운영자</span>
+              </Link>
+            )}
           </div>
         </header>
         <main>{children}</main>
