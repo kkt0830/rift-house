@@ -1,13 +1,13 @@
 export const POSITIONS = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'] as const;
 export type Position = (typeof POSITIONS)[number];
 export const TIERS = [
-  'IRON',
-  'BRONZE',
-  'SILVER',
-  'GOLD',
-  'PLATINUM',
-  'EMERALD',
-  'DIAMOND',
+  'IRON 4', 'IRON 3', 'IRON 2', 'IRON 1',
+  'BRONZE 4', 'BRONZE 3', 'BRONZE 2', 'BRONZE 1',
+  'SILVER 4', 'SILVER 3', 'SILVER 2', 'SILVER 1',
+  'GOLD 4', 'GOLD 3', 'GOLD 2', 'GOLD 1',
+  'PLATINUM 4', 'PLATINUM 3', 'PLATINUM 2', 'PLATINUM 1',
+  'EMERALD 4', 'EMERALD 3', 'EMERALD 2', 'EMERALD 1',
+  'DIAMOND 4', 'DIAMOND 3', 'DIAMOND 2', 'DIAMOND 1',
   'MASTER',
   'GRANDMASTER',
   'CHALLENGER',
@@ -90,6 +90,10 @@ export interface CommunityEvent {
   matchIds: string[];
   registrations: { playerId: string; status: RegistrationStatus }[];
 }
+export type CreateEventInput = Pick<
+  CommunityEvent,
+  'name' | 'description' | 'scheduledAt' | 'capacity'
+>;
 export interface RatingEvent {
   id: string;
   playerId: string;
