@@ -1,6 +1,7 @@
 import { Database } from '../domain/types';
 import { MAX_RATING, MIN_RATING } from '../domain/rating';
 export const CLEAN_START_MIGRATION = 'v0.1.1-remove-demo';
+export const TIER_DIVISION_MIGRATION = 'v0.1.2-tier-divisions';
 export function emptyDatabase(): Database {
   return {
     version: 1,
@@ -8,13 +9,27 @@ export function emptyDatabase(): Database {
     matches: [],
     events: [],
     ratingEvents: [],
-    migrations: [CLEAN_START_MIGRATION],
+    migrations: [CLEAN_START_MIGRATION, TIER_DIVISION_MIGRATION],
   };
 }
 // Remove only IDs reserved by v0.1 demo data, preserving user-created UUID records.
 export function migrateDatabase(input: Database): Database {
-  if (input.migrations?.includes(CLEAN_START_MIGRATION)) return input;
+  const cleanDone = input.migrations?.includes(CLEAN_START_MIGRATION);
+  const tiersDone = input.migrations?.includes(TIER_DIVISION_MIGRATION);
+  if (cleanDone && tiersDone) return input;
   const db = structuredClone(input);
+  if (!tiersDone) {
+    const legacy: Record<string, string> = {
+      IRON: 'IRON 4', BRONZE: 'BRONZE 4', SILVER: 'SILVER 4', GOLD: 'GOLD 4',
+      PLATINUM: 'PLATINUM 4', EMERALD: 'EMERALD 4', DIAMOND: 'DIAMOND 4',
+    };
+    db.players = db.players.map((player) => ({
+      ...player,
+      tier: (legacy[player.tier] ?? player.tier) as typeof player.tier,
+    }));
+    db.migrations = [...(db.migrations ?? []), TIER_DIVISION_MIGRATION];
+  }
+  if (cleanDone) return db;
   const demoIds = new Set(Array.from({ length: 20 }, (_, i) => `player-${i + 1}`));
   db.players = db.players
     .filter((p) => !demoIds.has(p.id))
