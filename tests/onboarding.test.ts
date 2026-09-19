@@ -9,7 +9,7 @@ const input = {
   displayName: '새 선수',
   riotId: 'My Player',
   riotTag: 'KR1',
-  tier: 'GOLD' as const,
+  tier: 'GOLD 4' as const,
   mainPosition: 'MID' as const,
   subPosition: 'TOP' as const,
 };
@@ -59,6 +59,62 @@ test('nickname lookup handles casing, tags, missing names and ambiguity', async 
   await assert.rejects(() => s.players.findByNickname('My Player'), /여러 명/);
   assert.equal((await s.players.findByNickname('MY PLAYER#kr1'))!.id, a.id);
   await assert.rejects(() => s.players.findByNickname('My Player#'), /형식/);
+});
+test('bulk import is atomic and applies tier ratings', async () => {
+  const s = createServices(new MemoryRepository());
+  const players = await s.players.importMany([
+    input,
+    { ...input, displayName: '두 번째', riotId: 'Second', tier: 'DIAMOND 4' },
+  ]);
+  assert.equal(players.length, 2);
+  assert.equal(players[1].internalRating, TIER_RATINGS['DIAMOND 4']);
+  await assert.rejects(
+    () => s.players.importMany([{ ...input, displayName: '중복', riotId: 'second', tier: 'IRON 4' }]),
+    /이미 등록/,
+  );
+  assert.equal((await s.players.list()).length, 2);
+});
+test('admins can create events with validated capacity and schedule', async () => {
+  const s = createServices(new MemoryRepository());
+  const event = await s.events.create({
+    name: '주말 내전',
+    description: '함께하는 내전',
+    scheduledAt: '2026-10-10T19:00:00+09:00',
+    capacity: 20,
+  });
+  assert.equal(event.name, '주말 내전');
+  assert.equal((await s.snapshot()).events.length, 1);
+  await assert.rejects(
+    () => s.events.create({ ...event, scheduledAt: 'invalid', capacity: 0 }),
+    /이벤트 이름, 일정, 정원/,
+  );
+});
+test('player deletion cleans editable references and protects recorded matches', async () => {
+  const s = createServices(new MemoryRepository());
+  const player = await s.players.registerSelf(input);
+  const match = await s.matches.create({
+    name: '삭제 확인', scheduledAt: '2026-10-10T19:00:00+09:00', format: 1,
+    fearless: false, participantIds: [player.id],
+  });
+  const event = await s.events.create({
+    name: '참가 이벤트', description: '', scheduledAt: '2026-10-11T19:00:00+09:00', capacity: 10,
+  });
+  await s.events.register(event.id, player.id);
+  await s.players.delete(player.id);
+  const db = await s.snapshot();
+  assert.equal(db.players.length, 0);
+  assert.deepEqual(db.matches.find((item) => item.id === match.id)?.participantIds, []);
+  assert.deepEqual(db.events[0].registrations, []);
+
+  const protectedPlayer = await s.players.registerSelf({ ...input, riotId: 'Recorded' });
+  const protectedMatch = await s.matches.create({
+    name: '기록 경기', scheduledAt: '2026-10-12T19:00:00+09:00', format: 1,
+    fearless: false, participantIds: [protectedPlayer.id],
+  });
+  const state = await s.snapshot();
+  state.matches.find((item) => item.id === protectedMatch.id)!.status = 'IN_PROGRESS';
+  const protectedServices = createServices(new MemoryRepository(state));
+  await assert.rejects(() => protectedServices.players.delete(protectedPlayer.id), /경기 기록/);
 });
 test('one-time cleanup removes demo records, retains custom records and fixes their references', () => {
   const db = createSeed();

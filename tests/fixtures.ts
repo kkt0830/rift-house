@@ -28,7 +28,7 @@ export function createSeed(): Database {
     displayName,
     riotId: ['Dawn', 'Forest Walk', 'Midnight', 'Kiting', 'Guardian'][i % 5] + (i + 1),
     riotTag: 'KR1',
-    tier: (['EMERALD', 'PLATINUM', 'DIAMOND', 'GOLD', 'EMERALD'] as const)[i % 5],
+    tier: (['EMERALD 4', 'PLATINUM 4', 'DIAMOND 4', 'GOLD 4', 'EMERALD 3'] as const)[i % 5],
     mainPosition: POSITIONS[i % 5],
     subPosition: POSITIONS[(i + 2) % 5],
     internalRating: 1300 + ((i * 73) % 480),
