@@ -34,7 +34,7 @@ npm ci
 npm run dev
 ```
 
-브라우저에서 [http://127.0.0.1:3000](http://127.0.0.1:3000)을 엽니다.
+브라우저에서 [https://rift-house.netlify.app/](https://rift-house.netlify.app/)을 엽니다.
 
 Supabase 환경변수를 설정하지 않으면 API 키 없이 로컬 모드로 실행됩니다. 초기 데이터는 비어 있으며, 직접 선수를 등록해 시작합니다. 관리자 로그인은 Supabase 연결과 별도로 등록된 관리자 계정이 필요합니다.
 
