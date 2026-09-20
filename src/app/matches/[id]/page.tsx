@@ -1,7 +1,8 @@
 'use client';
 import { use, useState } from 'react';
 import Link from 'next/link';
-import { Play, Shuffle, Scale, UserPlus } from 'lucide-react';
+import { CheckCircle2, Play, Shuffle, Scale, Trash2, UserPlus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { usePlatform } from '@/components/provider';
 import { Badge, Empty, formatDate, Modal, PageHeading, PlayerIdentity } from '@/components/ui';
 import { TeamBoard } from '@/components/team-board';
@@ -9,10 +10,12 @@ import { GameResults } from '@/components/game-results';
 import { BalanceOption } from '@/lib/balancing';
 export default function MatchDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { data, services, run, busy } = usePlatform();
+  const { data, services, run, busy, isAdmin } = usePlatform();
+  const router = useRouter();
   const [options, setOptions] = useState<BalanceOption[]>([]);
   const [adding, setAdding] = useState(false);
   const [cancel, setCancel] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const m = data.matches.find((m) => m.id === id);
   if (!m) return <Empty text="경기를 찾을 수 없습니다." />;
   const editable = ['DRAFT', 'READY'].includes(m.status);
@@ -160,10 +163,27 @@ export default function MatchDetail({ params }: { params: Promise<{ id: string }
         </section>
       )}
       <GameResults match={m} />
+      {isAdmin && m.status === 'IN_PROGRESS' && (
+        <div className="form-actions">
+          <button
+            disabled={busy || !m.series.games.length}
+            onClick={() => run(() => services.matches.complete(id), '내전을 종료했습니다.')}
+          >
+            <CheckCircle2 size={16} /> 내전 종료
+          </button>
+        </div>
+      )}
       {editable && (
         <div className="form-actions">
           <button className="danger-quiet" onClick={() => setCancel(true)}>
             경기 취소
+          </button>
+        </div>
+      )}
+      {isAdmin && (
+        <div className="form-actions">
+          <button className="danger-quiet" onClick={() => setDeleting(true)}>
+            <Trash2 size={16} /> 내전 삭제
           </button>
         </div>
       )}
@@ -207,6 +227,24 @@ export default function MatchDetail({ params }: { params: Promise<{ id: string }
               }}
             >
               경기 취소 확정
+            </button>
+          </div>
+        </Modal>
+      )}
+      {deleting && (
+        <Modal title="내전을 삭제할까요?" onClose={() => setDeleting(false)}>
+          <p>경기 결과와 이벤트 연결을 포함한 이 내전 기록이 삭제됩니다.</p>
+          <div className="form-actions">
+            <button onClick={() => setDeleting(false)}>돌아가기</button>
+            <button
+              className="danger-quiet"
+              disabled={busy}
+              onClick={async () => {
+                const removed = await run(() => services.matches.delete(id), '내전을 삭제했습니다.');
+                if (removed) router.replace('/matches');
+              }}
+            >
+              내전 삭제 확정
             </button>
           </div>
         </Modal>
