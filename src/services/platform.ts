@@ -66,6 +66,29 @@ function uniqueRiot(db: Database, p: Player) {
   )
     throw new Error('이미 등록된 Riot ID입니다.');
 }
+function removePlayerReferences(db: Database, playerIds: Set<string>) {
+  db.matches.forEach((match) => {
+    const participated = match.participantIds.some((playerId) => playerIds.has(playerId));
+    match.participantIds = match.participantIds.filter((playerId) => !playerIds.has(playerId));
+    match.teams = match.teams.filter((slot) => !playerIds.has(slot.playerId));
+    match.hostIds = match.hostIds.filter((playerId) => !playerIds.has(playerId));
+    match.series.games.forEach((game) => {
+      game.roster = game.roster.filter((slot) => !playerIds.has(slot.playerId));
+      game.picks = game.picks.filter((pick) => !playerIds.has(pick.playerId));
+    });
+    if (participated && ['DRAFT', 'READY'].includes(match.status)) {
+      match.status = 'DRAFT';
+      match.teams = [];
+    } else if (participated && match.status === 'IN_PROGRESS') {
+      match.status = 'CANCELLED';
+      match.teams = [];
+    }
+  });
+  db.events.forEach((event) => {
+    event.registrations = event.registrations.filter((registration) => !playerIds.has(registration.playerId));
+  });
+  db.ratingEvents = db.ratingEvents.filter((event) => !playerIds.has(event.playerId));
+}
 export function createServices(repository: Repository) {
   return {
     snapshot: () => repository.read(),
@@ -186,28 +209,16 @@ export function createServices(repository: Repository) {
           const player = db.players.find((p) => p.id === playerId);
           if (!player) throw new Error('이 선수를 찾을 수 없습니다.');
           db.players = db.players.filter((p) => p.id !== playerId);
-          db.matches.forEach((match) => {
-            const participated = match.participantIds.includes(playerId);
-            match.participantIds = match.participantIds.filter((id) => id !== playerId);
-            match.teams = match.teams.filter((slot) => slot.playerId !== playerId);
-            match.hostIds = match.hostIds.filter((id) => id !== playerId);
-            match.series.games.forEach((game) => {
-              game.roster = game.roster.filter((slot) => slot.playerId !== playerId);
-              game.picks = game.picks.filter((pick) => pick.playerId !== playerId);
-            });
-            if (participated && ['DRAFT', 'READY'].includes(match.status)) {
-              match.status = 'DRAFT';
-              match.teams = [];
-            } else if (participated && match.status === 'IN_PROGRESS') {
-              match.status = 'CANCELLED';
-              match.teams = [];
-            }
-          });
-          db.events.forEach((event) => {
-            event.registrations = event.registrations.filter((r) => r.playerId !== playerId);
-          });
-          db.ratingEvents = db.ratingEvents.filter((event) => event.playerId !== playerId);
+          removePlayerReferences(db, new Set([playerId]));
           return player;
+        }),
+      deleteAll: () =>
+        repository.transact((db) => {
+          const playerIds = new Set(db.players.map((player) => player.id));
+          const deletedCount = playerIds.size;
+          db.players = [];
+          removePlayerReferences(db, playerIds);
+          return deletedCount;
         }),
     },
     matches: {
