@@ -1,5 +1,6 @@
 import { Database } from '../domain/types';
 import { MAX_RATING, MIN_RATING } from '../domain/rating';
+import { seriesWinner } from '../domain/rules';
 export const CLEAN_START_MIGRATION = 'v0.1.1-remove-demo';
 export const TIER_DIVISION_MIGRATION = 'v0.1.2-tier-divisions';
 export function emptyDatabase(): Database {
@@ -16,8 +17,14 @@ export function emptyDatabase(): Database {
 export function migrateDatabase(input: Database): Database {
   const cleanDone = input.migrations?.includes(CLEAN_START_MIGRATION);
   const tiersDone = input.migrations?.includes(TIER_DIVISION_MIGRATION);
-  if (cleanDone && tiersDone) return input;
+  const staleCompleted = input.matches.some(
+    (match) => match.status === 'IN_PROGRESS' && seriesWinner(match.series),
+  );
+  if (cleanDone && tiersDone && !staleCompleted) return input;
   const db = structuredClone(input);
+  db.matches.forEach((match) => {
+    if (match.status === 'IN_PROGRESS' && seriesWinner(match.series)) match.status = 'COMPLETED';
+  });
   if (!tiersDone) {
     const legacy: Record<string, string> = {
       IRON: 'IRON 4', BRONZE: 'BRONZE 4', SILVER: 'SILVER 4', GOLD: 'GOLD 4',
