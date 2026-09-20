@@ -119,6 +119,36 @@ test('player deletion cleans references even when a match has started', async ()
   assert.equal(cleaned.players.some((item) => item.id === protectedPlayer.id), false);
   assert.equal(cleaned.matches.find((item) => item.id === protectedMatch.id)?.status, 'CANCELLED');
 });
+test('deleting all players clears every player reference atomically', async () => {
+  const state = emptyDatabase();
+  state.players.push(
+    { id: 'p1', displayName: '첫째', riotId: 'First', riotTag: 'KR1', tier: 'GOLD 4', mainPosition: 'TOP', subPosition: 'MID', internalRating: 1250, adminAdjustment: 0 },
+    { id: 'p2', displayName: '둘째', riotId: 'Second', riotTag: 'KR1', tier: 'SILVER 2', mainPosition: 'MID', subPosition: 'TOP', internalRating: 1120, adminAdjustment: 0 },
+  );
+  state.matches.push({
+    id: 'all-delete-match', name: '전체 삭제 경기', scheduledAt: '2026-10-12T19:00:00+09:00',
+    status: 'IN_PROGRESS', participantIds: ['p1', 'p2'], hostIds: ['p1'],
+    teams: [{ playerId: 'p1', position: 'TOP', side: 'BLUE' }],
+    series: { id: 'all-delete-series', format: 1, fearless: false, games: [] },
+  });
+  state.events.push({
+    id: 'all-delete-event', name: '전체 삭제 이벤트', description: '', scheduledAt: '2026-10-12T19:00:00+09:00',
+    capacity: 10, matchIds: ['all-delete-match'], registrations: [{ playerId: 'p2', status: 'APPLIED' }],
+  });
+  state.ratingEvents.push({
+    id: 'rating-p1', playerId: 'p1', before: 1200, delta: 50, reason: '테스트', createdAt: '2026-10-12T18:00:00+09:00',
+  });
+  const s = createServices(new MemoryRepository(state));
+  assert.equal(await s.players.deleteAll(), 2);
+  const cleaned = await s.snapshot();
+  assert.deepEqual(cleaned.players, []);
+  assert.deepEqual(cleaned.matches[0].participantIds, []);
+  assert.deepEqual(cleaned.matches[0].teams, []);
+  assert.deepEqual(cleaned.matches[0].hostIds, []);
+  assert.equal(cleaned.matches[0].status, 'CANCELLED');
+  assert.deepEqual(cleaned.events[0].registrations, []);
+  assert.deepEqual(cleaned.ratingEvents, []);
+});
 test('admins can finish and delete matches while cleaning linked records', async () => {
   const state = emptyDatabase();
   state.matches.push({
