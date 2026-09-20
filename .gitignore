@@ -11,3 +11,6 @@ test-results/
 *.log
 tmp/
 .test-build/
+
+# Local Netlify folder
+.netlify
