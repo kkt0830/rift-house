@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { readSheet } from 'read-excel-file/browser';
-import { FileSpreadsheet, Upload } from 'lucide-react';
+import { Download, FileSpreadsheet, Upload } from 'lucide-react';
 import { POSITIONS, TIERS } from '@/domain/types';
 import { SelfRegistrationInput } from '@/services/platform';
 import { usePlatform } from './provider';
@@ -14,6 +14,8 @@ const aliases = {
   mainPosition: ['주 포지션', 'mainPosition'],
   subPosition: ['부 포지션', 'subPosition'],
 } as const;
+
+const requiredHeaders = ['선수 이름', 'Riot ID', 'Riot Tag', '티어', '주 포지션', '부 포지션'];
 
 function normalize(value: unknown) {
   return String(value ?? '').trim();
@@ -73,21 +75,40 @@ export function PlayerImport() {
       <div className="section-heading">
         <div>
           <h2><FileSpreadsheet size={20} /> 엑셀 선수 일괄 등록</h2>
-          <p className="muted">첫 행에 선수 이름, Riot ID, Riot Tag, 티어, 주 포지션, 부 포지션 열을 넣어주세요.</p>
+          <p className="muted">예시 파일의 첫 번째 시트에 선수 정보를 입력한 뒤 그대로 업로드하세요.</p>
         </div>
-        <label className="button">
-          <Upload size={17} /> 파일 선택
-          <input
-            hidden
-            type="file"
-            accept=".xlsx"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) void parse(file);
-              event.target.value = '';
-            }}
-          />
-        </label>
+        <div className="import-actions">
+          <a
+            className="button"
+            href="/templates/rift-house-player-import-template.xlsx"
+            download="rift-house-player-import-template.xlsx"
+          >
+            <Download size={17} /> 예시 파일 다운로드
+          </a>
+          <label className="button primary">
+            <Upload size={17} /> 작성한 파일 선택
+            <input
+              hidden
+              type="file"
+              accept=".xlsx"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void parse(file);
+                event.target.value = '';
+              }}
+            />
+          </label>
+        </div>
+      </div>
+      <div className="import-guide" aria-label="엑셀 작성 방법">
+        <strong>작성 방법</strong>
+        <ol>
+          <li><b>선수 등록</b> 시트의 첫 행과 시트 이름은 변경하지 마세요.</li>
+          <li>열 순서는 <code>{requiredHeaders.join(' · ')}</code>입니다.</li>
+          <li>티어는 <code>GOLD 2</code>처럼 영문과 단계를 입력하세요. 마스터 이상은 단계가 없습니다.</li>
+          <li>포지션은 <code>TOP / JUNGLE / MID / ADC / SUPPORT</code> 중 하나를 입력하고, 주·부 포지션을 다르게 선택하세요.</li>
+          <li>레이팅은 입력하지 않아도 티어에 맞춰 자동으로 적용됩니다.</li>
+        </ol>
       </div>
       {fileName && <p><strong>{fileName}</strong> · {rows.length ? `${rows.length}명 확인됨` : '검사 중'}</p>}
       {error && <p className="form-error" role="alert">{error}</p>}
