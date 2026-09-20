@@ -89,7 +89,7 @@ test('admins can create events with validated capacity and schedule', async () =
     /이벤트 이름, 일정, 정원/,
   );
 });
-test('player deletion cleans editable references and protects recorded matches', async () => {
+test('player deletion cleans references even when a match has started', async () => {
   const s = createServices(new MemoryRepository());
   const player = await s.players.registerSelf(input);
   const match = await s.matches.create({
@@ -114,7 +114,44 @@ test('player deletion cleans editable references and protects recorded matches',
   const state = await s.snapshot();
   state.matches.find((item) => item.id === protectedMatch.id)!.status = 'IN_PROGRESS';
   const protectedServices = createServices(new MemoryRepository(state));
-  await assert.rejects(() => protectedServices.players.delete(protectedPlayer.id), /경기 기록/);
+  await protectedServices.players.delete(protectedPlayer.id);
+  const cleaned = await protectedServices.snapshot();
+  assert.equal(cleaned.players.some((item) => item.id === protectedPlayer.id), false);
+  assert.equal(cleaned.matches.find((item) => item.id === protectedMatch.id)?.status, 'CANCELLED');
+});
+test('admins can finish and delete matches while cleaning linked records', async () => {
+  const state = emptyDatabase();
+  state.matches.push({
+    id: 'manual-finish', name: '수동 종료', scheduledAt: '2026-10-12T19:00:00+09:00',
+    status: 'IN_PROGRESS', participantIds: [], teams: [], hostIds: [],
+    series: {
+      id: 'series-manual', format: 3, fearless: false,
+      games: [{ id: 'game-1', number: 1, winner: 'BLUE', picks: [], roster: [], completedAt: '2026-10-12T20:00:00+09:00' }],
+    },
+  });
+  state.events.push({
+    id: 'linked-event', name: '연결 이벤트', description: '', scheduledAt: '2026-10-12T19:00:00+09:00',
+    capacity: 10, matchIds: ['manual-finish'], registrations: [],
+  });
+  const s = createServices(new MemoryRepository(state));
+  await s.matches.complete('manual-finish');
+  assert.equal((await s.matches.getById('manual-finish'))?.status, 'COMPLETED');
+  await s.matches.delete('manual-finish');
+  const deleted = await s.snapshot();
+  assert.equal(deleted.matches.length, 0);
+  assert.deepEqual(deleted.events[0].matchIds, []);
+});
+test('migration repairs a match whose series has a winner but status is still in progress', () => {
+  const state = emptyDatabase();
+  state.matches.push({
+    id: 'stale-finish', name: '자동 보정', scheduledAt: '2026-10-12T19:00:00+09:00',
+    status: 'IN_PROGRESS', participantIds: [], teams: [], hostIds: [],
+    series: {
+      id: 'series-stale', format: 1, fearless: false,
+      games: [{ id: 'game-stale', number: 1, winner: 'RED', picks: [], roster: [], completedAt: '2026-10-12T20:00:00+09:00' }],
+    },
+  });
+  assert.equal(migrateDatabase(state).matches[0].status, 'COMPLETED');
 });
 test('one-time cleanup removes demo records, retains custom records and fixes their references', () => {
   const db = createSeed();
