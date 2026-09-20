@@ -185,18 +185,23 @@ export function createServices(repository: Repository) {
         repository.transact((db) => {
           const player = db.players.find((p) => p.id === playerId);
           if (!player) throw new Error('이 선수를 찾을 수 없습니다.');
-          const recorded = db.matches.some(
-            (match) =>
-              ['IN_PROGRESS', 'COMPLETED'].includes(match.status) &&
-              (match.participantIds.includes(playerId) ||
-                match.series.games.some((game) => game.roster.some((slot) => slot.playerId === playerId))),
-          );
-          if (recorded) throw new Error('진행 중이거나 완료된 경기 기록이 있는 선수는 삭제할 수 없습니다.');
           db.players = db.players.filter((p) => p.id !== playerId);
           db.matches.forEach((match) => {
+            const participated = match.participantIds.includes(playerId);
             match.participantIds = match.participantIds.filter((id) => id !== playerId);
             match.teams = match.teams.filter((slot) => slot.playerId !== playerId);
-            if (match.status === 'READY') match.status = 'DRAFT';
+            match.hostIds = match.hostIds.filter((id) => id !== playerId);
+            match.series.games.forEach((game) => {
+              game.roster = game.roster.filter((slot) => slot.playerId !== playerId);
+              game.picks = game.picks.filter((pick) => pick.playerId !== playerId);
+            });
+            if (participated && ['DRAFT', 'READY'].includes(match.status)) {
+              match.status = 'DRAFT';
+              match.teams = [];
+            } else if (participated && match.status === 'IN_PROGRESS') {
+              match.status = 'CANCELLED';
+              match.teams = [];
+            }
           });
           db.events.forEach((event) => {
             event.registrations = event.registrations.filter((r) => r.playerId !== playerId);
@@ -296,6 +301,23 @@ export function createServices(repository: Repository) {
           const m = getMatch(db, matchId);
           editable(m);
           m.status = 'CANCELLED';
+        }),
+      complete: (matchId: string) =>
+        repository.transact((db) => {
+          const m = getMatch(db, matchId);
+          if (m.status !== 'IN_PROGRESS') throw new Error('진행 중인 경기만 종료할 수 있습니다.');
+          if (!m.series.games.length) throw new Error('최소 한 게임 결과를 기록한 뒤 종료해 주세요.');
+          m.status = 'COMPLETED';
+        }),
+      delete: (matchId: string) =>
+        repository.transact((db) => {
+          const m = getMatch(db, matchId);
+          db.matches = db.matches.filter((match) => match.id !== matchId);
+          db.events.forEach((event) => {
+            event.matchIds = event.matchIds.filter((id) => id !== matchId);
+          });
+          db.ratingEvents = db.ratingEvents.filter((event) => event.matchId !== matchId);
+          return m;
         }),
       submitGameResult: (
         matchId: string,
