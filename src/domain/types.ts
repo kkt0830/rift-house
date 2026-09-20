@@ -12,6 +12,10 @@ export const TIERS = [
   'GRANDMASTER',
   'CHALLENGER',
 ] as const;
+export const TIER_GROUPS = [
+  'IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'EMERALD',
+  'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER',
+] as const;
 export type Tier = (typeof TIERS)[number];
 export type Side = 'BLUE' | 'RED';
 export type Format = 1 | 3 | 5;
