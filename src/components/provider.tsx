@@ -5,6 +5,7 @@ import { LocalIdentityRepository } from '@/data/identity';
 import { createRepository } from '@/data/repository';
 import { createServices, Services } from '@/services/platform';
 import { supabase } from '@/lib/supabase';
+export type AdminRole = 'ADMIN' | 'OWNER';
 type Context = {
   data: Database;
   services: Services;
@@ -16,6 +17,8 @@ type Context = {
   pendingName: { riotId: string; riotTag: string } | null;
   setPendingName: (value: { riotId: string; riotTag: string } | null) => void;
   isAdmin: boolean;
+  isOwner: boolean;
+  adminRole: AdminRole | null;
   adminId: string | null;
   adminLogin: (username: string, password: string) => Promise<boolean>;
   adminLogout: () => Promise<void>;
@@ -31,6 +34,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [adminRole, setAdminRole] = useState<AdminRole | null>(null);
   const [adminId, setAdminId] = useState<string | null>(null);
   const refresh = useCallback(async () => {
     setData(await services.snapshot());
@@ -69,11 +73,19 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await client.rpc('admin_session_role', { p_token: token });
       if (error || !data) {
         localStorage.removeItem('rift-house:admin-session');
+        setAdminRole(null);
         setAdminId(null);
         return setIsAdmin(false);
       }
-      const separator = String(data).indexOf(':');
-      setAdminId(separator > -1 ? String(data).slice(separator + 1) : String(data));
+      const [role, ...idParts] = String(data).split(':');
+      if ((role !== 'ADMIN' && role !== 'OWNER') || !idParts.length) {
+        localStorage.removeItem('rift-house:admin-session');
+        setAdminRole(null);
+        setAdminId(null);
+        return setIsAdmin(false);
+      }
+      setAdminRole(role);
+      setAdminId(idParts.join(':'));
       setIsAdmin(true);
     };
     void checkAdmin();
@@ -120,9 +132,18 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
       });
       if (error) throw error;
       if (!data) throw new Error('아이디 또는 비밀번호가 올바르지 않습니다.');
-      localStorage.setItem('rift-house:admin-session', String(data));
+      const token = String(data);
+      const { data: session, error: sessionError } = await supabase.rpc('admin_session_role', {
+        p_token: token,
+      });
+      if (sessionError || !session) throw new Error('관리자 권한을 확인하지 못했습니다.');
+      const [role, ...idParts] = String(session).split(':');
+      if ((role !== 'ADMIN' && role !== 'OWNER') || !idParts.length)
+        throw new Error('관리자 권한 정보가 올바르지 않습니다.');
+      localStorage.setItem('rift-house:admin-session', token);
       setIsAdmin(true);
-      setAdminId(username.trim().toLowerCase());
+      setAdminRole(role);
+      setAdminId(idParts.join(':'));
       setNotice({ text: '관리자로 로그인했습니다.', error: false });
       return true;
     } catch (error) {
@@ -140,6 +161,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     if (token) await supabase?.rpc('admin_logout', { p_token: token });
     localStorage.removeItem('rift-house:admin-session');
     setIsAdmin(false);
+    setAdminRole(null);
     setAdminId(null);
     setNotice({ text: '관리자에서 로그아웃했습니다.', error: false });
   }
@@ -169,6 +191,8 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
             pendingName,
             setPendingName,
             isAdmin,
+            isOwner: adminRole === 'OWNER',
+            adminRole,
             adminId,
             adminLogin,
             adminLogout,

@@ -22,7 +22,7 @@ const nav = [
 ];
 export function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
-  const { currentPlayer, clearProfile, isAdmin } = usePlatform();
+  const { currentPlayer, clearProfile, isAdmin, isOwner } = usePlatform();
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -56,10 +56,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <Shield size={18} />
             운영자
           </Link>
-          <Link href="/owner">
-            <Crown size={18} />
-            시스템 설정
-          </Link>
+          {isOwner && (
+            <Link className={path === '/owner' ? 'active' : ''} href="/owner">
+              <Crown size={18} />
+              시스템 설정
+            </Link>
+          )}
           </>}
           <div className="community-label">
             <span className="community-icon">RH</span>

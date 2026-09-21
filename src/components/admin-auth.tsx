@@ -82,3 +82,15 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
     );
   return children;
 }
+
+export function OwnerGuard({ children }: { children: React.ReactNode }) {
+  const { isOwner } = usePlatform();
+  if (!isOwner)
+    return (
+      <section className="panel padded">
+        <h1>OWNER 권한이 필요합니다</h1>
+        <p className="muted">시스템 관리는 OWNER 계정만 사용할 수 있습니다.</p>
+      </section>
+    );
+  return children;
+}
